@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:background="#12141C" android:padding="20dp">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="TFT Trung Quốc - Dịch Siêu Tốc" android:textColor="#F0E6D2" android:textSize="22sp" android:textStyle="bold" />
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="24dp" android:text="1. Dán Gemini API Key (aistudio.google.com):" android:textColor="#FFFFFF" android:textSize="14sp" android:textStyle="bold" />
+        <EditText android:id="@+id/etApiKey" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:background="#1E232D" android:hint="AIzaSy..." android:inputType="textNoSuggestions" android:padding="12dp" android:textColor="#FFFFFF" android:textColorHint="#6C7380" />
+        <Button android:id="@+id/btnSaveKey" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:backgroundTint="#2E7D32" android:text="Lưu API Key" android:textColor="#FFFFFF" />
+        <Button android:id="@+id/btnGrantOverlay" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:backgroundTint="#37474F" android:text="Cấp quyền hiển thị trên ứng dụng khác" android:textColor="#FFFFFF" />
+        <Button android:id="@+id/btnStart" android:layout_width="match_parent" android:layout_height="54dp" android:layout_marginTop="12dp" android:backgroundTint="#1E88E5" android:text="BẮT ĐẦU (HIỆN NÚT NỔI)" android:textColor="#FFFFFF" android:textStyle="bold" />
+        <Button android:id="@+id/btnStop" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:backgroundTint="#C62828" android:text="Tắt nút nổi" android:textColor="#FFFFFF" />
+    </LinearLayout>
+</ScrollView>
