@@ -316,12 +316,10 @@ class FloatingTranslateService : Service() {
                         }.thenBy { it.boundingBox?.top ?: 0 }
                     )
 
-                    val extracted = sortedBlocks.joinToString("
-") { it.text }.trim()
+                    val extracted = sortedBlocks.joinToString("\n") { it.text }.trim()
                     if (extracted.isEmpty()) {
                         isProcessing = false
-                        showResultCard("Không nhận diện được chữ tiếng Trung trong vùng quét.
-(Nhấn giữ nút Dịch để chọn lại vùng quét)")
+                        showResultCard("Không nhận diện được chữ tiếng Trung trong vùng quét.\n(Nhấn giữ nút Dịch để chọn lại vùng quét)")
                         return@addOnSuccessListener
                     }
 
