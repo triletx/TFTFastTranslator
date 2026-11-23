@@ -46,16 +46,13 @@ class FloatingTranslateService : Service() {
         const val EXTRA_RESULT_DATA = "result_data"
         private const val CHANNEL_ID = "tft_fast_translator_channel"
         private const val NOTIF_ID = 1001
+        private const val CAPTURE_SCALE = 0.7f
     }
 
     private lateinit var windowManager: WindowManager
     private var mediaProjection: MediaProjection? = null
     private var virtualDisplay: VirtualDisplay? = null
     private var imageReader: ImageReader? = null
-
-    private var currentWidth = 0
-    private var currentHeight = 0
-    private var currentDensity = 0
 
     private var bubbleView: TextView? = null
     private var resultContainer: ScrollView? = null
@@ -110,6 +107,7 @@ class FloatingTranslateService : Service() {
 
     private fun setupMediaProjection(resultCode: Int, data: Intent) {
         val mpm = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+        releaseCapture()
         mediaProjection?.stop()
         mediaProjection = mpm.getMediaProjection(resultCode, data)
         mediaProjection?.registerCallback(object : MediaProjection.Callback() {
@@ -117,8 +115,6 @@ class FloatingTranslateService : Service() {
                 stopSelf()
             }
         }, mainHandler)
-
-        ensureVirtualDisplay()
     }
 
     private fun getScreenDimensions(): Triple<Int, Int, Int> {
@@ -134,34 +130,28 @@ class FloatingTranslateService : Service() {
         }
     }
 
-    private fun ensureVirtualDisplay() {
+    private fun startOneShotCapture() {
+        releaseCapture()
         val (w, h, d) = getScreenDimensions()
-        if (virtualDisplay != null && w == currentWidth && h == currentHeight) {
-            return
-        }
+        val capW = (w * CAPTURE_SCALE).toInt().coerceAtLeast(1)
+        val capH = (h * CAPTURE_SCALE).toInt().coerceAtLeast(1)
 
-        currentWidth = w
-        currentHeight = h
-        currentDensity = d
+        imageReader = ImageReader.newInstance(capW, capH, PixelFormat.RGBA_8888, 2)
+        virtualDisplay = mediaProjection?.createVirtualDisplay(
+            "TFTTranslatorCapture",
+            capW, capH, d,
+            DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+            imageReader?.surface,
+            null,
+            mainHandler
+        )
+    }
 
-        val oldReader = imageReader
-        imageReader = ImageReader.newInstance(w, h, PixelFormat.RGBA_8888, 2)
-
-        if (virtualDisplay == null) {
-            virtualDisplay = mediaProjection?.createVirtualDisplay(
-                "TFTTranslatorCapture",
-                w, h, d,
-                DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-                imageReader?.surface,
-                null,
-                mainHandler
-            )
-        } else {
-            virtualDisplay?.resize(w, h, d)
-            virtualDisplay?.surface = imageReader?.surface
-        }
-
-        oldReader?.close()
+    private fun releaseCapture() {
+        try { virtualDisplay?.release() } catch (_: Exception) {}
+        virtualDisplay = null
+        try { imageReader?.close() } catch (_: Exception) {}
+        imageReader = null
     }
 
     private fun addFloatingBubble() {
@@ -271,15 +261,14 @@ class FloatingTranslateService : Service() {
         if (isProcessing) return
         isProcessing = true
 
-        // Hide existing overlay so we don't OCR our own translation text
         hideResultCard()
         bubbleView?.visibility = View.INVISIBLE
 
-        ensureVirtualDisplay()
+        startOneShotCapture()
 
-        // Wait 1 frame (~60ms) for bubble to disappear & orientation surface to refresh
         mainHandler.postDelayed({
             val bitmap = captureFrame()
+            releaseCapture()
             bubbleView?.visibility = View.VISIBLE
 
             if (bitmap == null) {
@@ -303,12 +292,10 @@ class FloatingTranslateService : Service() {
             recognizer.process(image)
                 .addOnSuccessListener { visionText ->
                     cropped.recycle()
-                    // Sort blocks left-to-right (grouped into 3 columns if landscape augments)
                     val sortedBlocks = visionText.textBlocks.sortedWith(
                         compareBy<com.google.mlkit.vision.text.Text.TextBlock> {
                             val box = it.boundingBox
                             if (box != null && cropW > cropH) {
-                                // Divide landscape into 3 vertical columns for 3 Augments
                                 (box.centerX() * 3) / cropW
                             } else {
                                 0
@@ -335,7 +322,7 @@ class FloatingTranslateService : Service() {
                     isProcessing = false
                     showResultCard("Lỗi quét OCR: ${e.message}")
                 }
-        }, 80)
+        }, 120)
     }
 
     private fun captureFrame(): Bitmap? {
@@ -449,8 +436,7 @@ class FloatingTranslateService : Service() {
             try { windowManager.removeView(it) } catch (_: Exception) {}
         }
         bubbleView = null
-        virtualDisplay?.release()
-        imageReader?.close()
+        releaseCapture()
         mediaProjection?.stop()
         recognizer.close()
     }
