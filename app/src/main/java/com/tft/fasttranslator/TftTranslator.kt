@@ -44,7 +44,7 @@ QUY TẮC BẮT BUỘC:
 
         cache.get(cleaned)?.let { return@withContext it }
 
-        val models = listOf("gemini-2.5-flash-lite", "gemini-2.5-flash")
+        val models = listOf("gemini-flash-lite-latest", "gemini-flash-latest")
         var lastError = "Lỗi kết nối API."
 
         for (model in models) {
@@ -76,7 +76,7 @@ QUY TẮC BẮT BUỘC:
                 put("temperature", 0.1)
                 put("maxOutputTokens", 350)
                 // Disable thinking for sub-second speed on 2.5 models
-                put("thinkingConfig", JSONObject().put("thinkingBudget", 0))
+                
             })
         }
 
