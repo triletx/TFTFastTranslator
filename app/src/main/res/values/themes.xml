@@ -1,8 +1,11 @@
 <resources>
     <style name="Theme.TFTFastTranslator" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-        <item name="colorPrimary">#1E88E5</item>
-        <item name="colorPrimaryVariant">#1565C0</item>
-        <item name="colorOnPrimary">#FFFFFF</item>
-        <item name="android:statusBarColor">#121212</item>
+        <item name="colorPrimary">#C8AA6E</item>
+        <item name="colorPrimaryVariant">#785A28</item>
+        <item name="colorOnPrimary">#091428</item>
+        <item name="colorSecondary">#0AC8B9</item>
+        <item name="colorAccent">#0AC8B9</item>
+        <item name="android:statusBarColor">#091428</item>
+        <item name="android:navigationBarColor">#091428</item>
     </style>
 </resources>

@@ -1,6 +1,6 @@
 package com.tft.fasttranslator
 
-import android.util.LruCache
+import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -14,92 +14,175 @@ import java.util.concurrent.TimeUnit
 object TftTranslator {
 
     private val client = OkHttpClient.Builder()
-        .connectTimeout(6, TimeUnit.SECONDS)
-        .readTimeout(10, TimeUnit.SECONDS)
-        .writeTimeout(6, TimeUnit.SECONDS)
+        .connectTimeout(8, TimeUnit.SECONDS)
+        .readTimeout(14, TimeUnit.SECONDS)
+        .writeTimeout(8, TimeUnit.SECONDS)
         .build()
 
-    // Instant 0ms cache for repeated tooltips/augments in the same session
-    private val cache = LruCache<String, String>(200)
+    private val MODELS = listOf("gemini-flash-lite-latest", "gemini-flash-latest")
 
-    private const val SYSTEM_PROMPT = """Bạn là trợ lý dịch thuật tốc độ cao chuyên game Đấu Trường Chân Lý (TFT / 金铲铲之战) từ tiếng Trung sang tiếng Việt.
-QUY TẮC BẮT BUỘC:
-1. Dùng chuẩn thuật ngữ TFT Việt Nam:
-   - 攻击力 -> SMCK | 法术强度 -> SMPT | 攻速 -> Tốc đánh | 护甲 -> Giáp | 魔抗 -> Kháng phép
-   - 最大生命值 -> Máu tối đa | 全能吸血 -> Hút máu toàn phần | 护盾 -> Lá chắn | 暴击 -> Chí mạng
-   - 破甲/护甲击碎 -> Cào giáp | 魔抗击碎 -> Xuyên kháng phép | 重伤 -> Vết thương sâu | 灼烧 -> Thiêu đốt
-   - 强化符文 -> Lõi Công Nghệ | 羁绊 -> Tộc/Hệ | 装备 -> Trang bị | 金币 -> Vàng | 经验值 -> Kinh nghiệm
-   - 弈子/英雄 -> Tướng | 刷新 -> Roll | 备战席 -> Hàng chờ | 生命值 -> Máu
-2. Cực kỳ ngắn gọn, súc tích, chỉ giữ thông số và hiệu ứng chính để người chơi đọc trong 1 giây. Bỏ lời văn thừa.
-3. Nếu văn bản gồm 3 Lõi Công Nghệ (tách theo cụm Trái/Giữa/Phải), trình bày rõ thành 3 mục:
-   [1] Tên lõi: Hiệu ứng ngắn gọn
-   [2] Tên lõi: Hiệu ứng ngắn gọn
-   [3] Tên lõi: Hiệu ứng ngắn gọn
-4. Không giải thích dài dòng, không chào hỏi, chỉ trả về bản dịch tiếng Việt."""
+    private const val SYSTEM_PROMPT_BATCH = """Bạn là chuyên gia dịch game Đấu Trường Chân Lý (TFT / Kim Xẻng - 金铲铲之战) Trung sang Việt.
+Nhiệm vụ: Dịch từng giá trị trong JSON object sang tiếng Việt CỰC NGẮN GỌN để hiển thị đè trực tiếp lên màn hình game.
+Quy tắc:
+- Dùng đúng thuật ngữ ĐTCL Việt Nam: Lõi Công Nghệ, STVL, SMPT, Hút máu toàn phần, Lá chắn, Tốc đánh, Giáp, Kháng phép, Lượt roll, Tộc/Hệ, Ấn, Hàng chờ, Chuyển đổi.
+- Giữ nguyên mọi con số và %. Không giải thích thêm.
+- BẮT BUỘC trả về đúng 1 JSON object chứa chính xác các key số như đầu vào."""
 
-    suspend fun translate(chineseText: String, apiKey: String): String = withContext(Dispatchers.IO) {
-        val cleaned = chineseText.trim()
-        if (cleaned.isEmpty()) return@withContext "Không thấy chữ tiếng Trung trong vùng quét."
-        if (apiKey.isBlank()) return@withContext "Chưa nhập Gemini API Key trong app."
+    private const val SYSTEM_PROMPT_SUMMARY = """Bạn là chuyên gia dịch nhanh game Đấu Trường Chân Lý (TFT / Kim Xẻng - 金铲铲之战) Trung sang Việt.
+Dịch cực ngắn gọn, đi thẳng vào tên và hiệu ứng chính. Nếu có 3 Lõi Công Nghệ, chia rõ 3 mục [1], [2], [3].
+Dùng đúng thuật ngữ ĐTCL Việt Nam (STVL, SMPT, Hút máu toàn phần, Lá chắn, Tốc đánh, Lượt roll, Ấn...). Giữ nguyên các con số."""
 
-        cache.get(cleaned)?.let { return@withContext it }
+    suspend fun translateBlocks(
+        context: Context,
+        blocks: List<String>,
+        apiKey: String
+    ): Result<List<String>> = withContext(Dispatchers.IO) {
+        if (blocks.isEmpty()) return@withContext Result.success(emptyList())
 
-        val models = listOf("gemini-flash-lite-latest", "gemini-flash-latest")
-        var lastError = "Lỗi kết nối API."
+        val results = MutableList(blocks.size) { "" }
+        val uncached = mutableListOf<Pair<Int, String>>()
 
-        for (model in models) {
-            try {
-                val result = callGemini(model, cleaned, apiKey)
-                if (result != null) {
-                    cache.put(cleaned, result)
-                    return@withContext result
-                }
-            } catch (e: Exception) {
-                lastError = "Lỗi ($model): ${e.message}"
+        blocks.forEachIndexed { idx, raw ->
+            val cached = Prefs.getCached(context, raw)
+            if (cached != null) {
+                results[idx] = cached
+            } else {
+                uncached.add(idx to raw)
             }
         }
-        return@withContext lastError
+
+        if (uncached.isEmpty()) {
+            return@withContext Result.success(results)
+        }
+
+        if (apiKey.isBlank()) {
+            return@withContext Result.failure(IllegalStateException("Chưa nhập Gemini API Key!"))
+        }
+
+        val inputJson = JSONObject()
+        uncached.forEach { (idx, text) ->
+            inputJson.put(idx.toString(), text)
+        }
+
+        val apiResult = callGemini(
+            apiKey = apiKey,
+            systemPrompt = SYSTEM_PROMPT_BATCH,
+            userContent = inputJson.toString(),
+            expectJson = true
+        )
+
+        apiResult.fold(
+            onSuccess = { rawOutput ->
+                try {
+                    val cleaned = rawOutput.trim()
+                        .removePrefix("```json")
+                        .removePrefix("```")
+                        .removeSuffix("```")
+                        .trim()
+                    val start = cleaned.indexOf('{')
+                    val end = cleaned.lastIndexOf('}')
+                    if (start == -1 || end == -1 || end <= start) {
+                        return@withContext Result.failure(IllegalStateException("Phản hồi JSON không hợp lệ"))
+                    }
+                    val parsed = JSONObject(cleaned.substring(start, end + 1))
+                    uncached.forEach { (idx, origText) ->
+                        val translated = parsed.optString(idx.toString(), "").trim()
+                        if (translated.isNotEmpty()) {
+                            results[idx] = translated
+                            Prefs.putCached(context, origText, translated)
+                        } else {
+                            results[idx] = origText
+                        }
+                    }
+                    Result.success(results)
+                } catch (e: Exception) {
+                    Result.failure(IllegalStateException("Lỗi đọc JSON dịch: ${e.message}"))
+                }
+            },
+            onFailure = { Result.failure(it) }
+        )
     }
 
-    private fun callGemini(model: String, text: String, apiKey: String): String? {
-        val url = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey"
+    suspend fun translateSummary(
+        context: Context,
+        fullText: String,
+        apiKey: String
+    ): Result<String> = withContext(Dispatchers.IO) {
+        val cached = Prefs.getCached(context, "SUM::$fullText")
+        if (cached != null) return@withContext Result.success(cached)
 
-        val payload = JSONObject().apply {
-            put("systemInstruction", JSONObject().apply {
-                put("parts", JSONArray().put(JSONObject().put("text", SYSTEM_PROMPT)))
-            })
-            put("contents", JSONArray().put(JSONObject().apply {
-                put("role", "user")
-                put("parts", JSONArray().put(JSONObject().put("text", text)))
-            }))
-            put("generationConfig", JSONObject().apply {
-                put("temperature", 0.1)
-                put("maxOutputTokens", 350)
-                // Disable thinking for sub-second speed on 2.5 models
-                
-            })
+        if (apiKey.isBlank()) {
+            return@withContext Result.failure(IllegalStateException("Chưa nhập Gemini API Key!"))
         }
 
-        val body = payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
-        val request = Request.Builder().url(url).post(body).build()
+        val apiResult = callGemini(
+            apiKey = apiKey,
+            systemPrompt = SYSTEM_PROMPT_SUMMARY,
+            userContent = fullText,
+            expectJson = false
+        )
 
-        client.newCall(request).execute().use { resp ->
-            val respBody = resp.body?.string() ?: return null
-            if (!resp.isSuccessful) {
-                throw RuntimeException("HTTP ${resp.code}: ${respBody.take(160)}")
-            }
-            val json = JSONObject(respBody)
-            val candidates = json.optJSONArray("candidates") ?: return null
-            if (candidates.length() == 0) return null
-            val parts = candidates.getJSONObject(0)
-                .optJSONObject("content")
-                ?.optJSONArray("parts") ?: return null
-            val sb = StringBuilder()
-            for (i in 0 until parts.length()) {
-                sb.append(parts.getJSONObject(i).optString("text", ""))
-            }
-            val translated = sb.toString().trim()
-            return translated.ifEmpty { null }
+        apiResult.onSuccess { translated ->
+            Prefs.putCached(context, "SUM::$fullText", translated)
         }
+    }
+
+    private fun callGemini(
+        apiKey: String,
+        systemPrompt: String,
+        userContent: String,
+        expectJson: Boolean
+    ): Result<String> {
+        var lastError = "Không kết nối được Gemini API"
+
+        for (model in MODELS) {
+            try {
+                val url = "[https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey](https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey)"
+                val genConfig = JSONObject().apply {
+                    put("temperature", 0.1)
+                    put("maxOutputTokens", 1024)
+                    if (expectJson) {
+                        put("responseMimeType", "application/json")
+                    }
+                }
+                val bodyJson = JSONObject().apply {
+                    put("system_instruction", JSONObject().apply {
+                        put("parts", JSONArray().put(JSONObject().put("text", systemPrompt)))
+                    })
+                    put("contents", JSONArray().put(JSONObject().apply {
+                        put("parts", JSONArray().put(JSONObject().put("text", userContent)))
+                    }))
+                    put("generationConfig", genConfig)
+                }
+
+                val request = Request.Builder()
+                    .url(url)
+                    .post(bodyJson.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+                    .build()
+
+                client.newCall(request).execute().use { resp ->
+                    val respText = resp.body?.string() ?: ""
+                    if (!resp.isSuccessful) {
+                        lastError = "Lỗi ($model): HTTP ${resp.code}"
+                        continue
+                    }
+                    val root = JSONObject(respText)
+                    val text = root.optJSONArray("candidates")
+                        ?.optJSONObject(0)
+                        ?.optJSONObject("content")
+                        ?.optJSONArray("parts")
+                        ?.optJSONObject(0)
+                        ?.optString("text", "")
+                        ?.trim()
+                        ?: ""
+                    if (text.isNotEmpty()) {
+                        return Result.success(text)
+                    }
+                }
+            } catch (e: Exception) {
+                lastError = "Lỗi mạng ($model): ${e.message}"
+            }
+        }
+        return Result.failure(IllegalStateException(lastError))
     }
 }

@@ -1,12 +1,231 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:background="#12141C" android:padding="20dp">
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
-        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="TFT Trung Quốc - Dịch Siêu Tốc" android:textColor="#F0E6D2" android:textSize="22sp" android:textStyle="bold" />
-        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="24dp" android:text="1. Dán Gemini API Key (aistudio.google.com):" android:textColor="#FFFFFF" android:textSize="14sp" android:textStyle="bold" />
-        <EditText android:id="@+id/etApiKey" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:background="#1E232D" android:hint="AIzaSy..." android:inputType="textNoSuggestions" android:padding="12dp" android:textColor="#FFFFFF" android:textColorHint="#6C7380" />
-        <Button android:id="@+id/btnSaveKey" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:backgroundTint="#2E7D32" android:text="Lưu API Key" android:textColor="#FFFFFF" />
-        <Button android:id="@+id/btnGrantOverlay" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:backgroundTint="#37474F" android:text="Cấp quyền hiển thị trên ứng dụng khác" android:textColor="#FFFFFF" />
-        <Button android:id="@+id/btnStart" android:layout_width="match_parent" android:layout_height="54dp" android:layout_marginTop="12dp" android:backgroundTint="#1E88E5" android:text="BẮT ĐẦU (HIỆN NÚT NỔI)" android:textColor="#FFFFFF" android:textStyle="bold" />
-        <Button android:id="@+id/btnStop" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:backgroundTint="#C62828" android:text="Tắt nút nổi" android:textColor="#FFFFFF" />
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#091428"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:letterSpacing="0.08"
+            android:text="TFT DỊCH SIÊU TỐC"
+            android:textColor="#F0E6D2"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Hextech Edition • Dịch đè trực tiếp trên màn hình"
+            android:textColor="#0AC8B9"
+            android:textSize="12sp" />
+
+        <!-- API Key Card -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:background="@drawable/bg_hextech_card"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="GEMINI API KEY"
+                android:textColor="#C8AA6E"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <EditText
+                android:id="@+id/etApiKey"
+                android:layout_width="match_parent"
+                android:layout_height="46dp"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/bg_hextech_input"
+                android:hint="Dán khóa AIzaSy... tại đây"
+                android:inputType="textNoSuggestions"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:singleLine="true"
+                android:textColor="#F0E6D2"
+                android:textColorHint="#5B6B82"
+                android:textSize="13sp" />
+
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/btnSaveKey"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/bg_hextech_btn_gold"
+                android:text="LƯU API KEY"
+                android:textAllCaps="false"
+                android:textColor="#091428"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- Display & Cache Settings Card -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:background="@drawable/bg_hextech_card"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="HIỂN THỊ &amp; TỐC ĐỘ"
+                android:textColor="#C8AA6E"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Dịch đè trực tiếp tại chỗ"
+                        android:textColor="#F0E6D2"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Tắt để dùng Bảng tóm tắt phía trên"
+                        android:textColor="#8A99B0"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <com.google.android.material.switchmaterial.SwitchMaterial
+                    android:id="@+id/switchInPlace"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="12dp"
+                android:layout_marginBottom="12dp"
+                android:background="#26C8AA6E" />
+
+            <TextView
+                android:id="@+id/tvFontSizeLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Cỡ chữ bản dịch: 13sp"
+                android:textColor="#F0E6D2"
+                android:textSize="13sp" />
+
+            <SeekBar
+                android:id="@+id/seekFontSize"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:max="8"
+                android:progress="3" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="12dp"
+                android:layout_marginBottom="12dp"
+                android:background="#26C8AA6E" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/tvCacheCount"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Bộ nhớ đệm (Cache): 0 mục"
+                    android:textColor="#A0B0C8"
+                    android:textSize="13sp" />
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/btnClearCache"
+                    android:layout_width="wrap_content"
+                    android:layout_height="34dp"
+                    android:background="@drawable/bg_hextech_btn_dark"
+                    android:paddingStart="14dp"
+                    android:paddingEnd="14dp"
+                    android:text="Xóa Cache"
+                    android:textAllCaps="false"
+                    android:textColor="#F0E6D2"
+                    android:textSize="12sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Action Controls -->
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/btnGrantOverlay"
+            android:layout_width="match_parent"
+            android:layout_height="46dp"
+            android:layout_marginTop="18dp"
+            android:background="@drawable/bg_hextech_btn_dark"
+            android:text="Cấp quyền hiển thị trên ứng dụng khác"
+            android:textAllCaps="false"
+            android:textColor="#F0E6D2"
+            android:textSize="14sp" />
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/btnStart"
+            android:layout_width="match_parent"
+            android:layout_height="54dp"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_hextech_btn_cyan"
+            android:text="BẮT ĐẦU (HIỆN NÚT NỔI)"
+            android:textAllCaps="false"
+            android:textColor="#091428"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/btnStop"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/bg_hextech_btn_danger"
+            android:text="Tắt nút nổi"
+            android:textAllCaps="false"
+            android:textColor="#FF8A9A"
+            android:textSize="14sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:lineSpacingExtra="4dp"
+            android:text="• Chạm nút nổi: Dịch ngay toàn màn hình\n• Nhấn giữ 0.5s: Khoanh vùng quét (chạm nhẹ để reset Full)\n• Kéo nút xuống chữ X ở đáy màn hình để tắt nhanh"
+            android:textColor="#6F829E"
+            android:textSize="12sp" />
     </LinearLayout>
 </ScrollView>
