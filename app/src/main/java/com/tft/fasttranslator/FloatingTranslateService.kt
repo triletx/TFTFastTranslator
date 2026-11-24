@@ -11,6 +11,7 @@ import android.content.pm.ServiceInfo
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.PixelFormat
+import android.graphics.RectF
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
 import android.media.ImageReader
@@ -46,13 +47,15 @@ class FloatingTranslateService : Service() {
         const val EXTRA_RESULT_DATA = "result_data"
         private const val CHANNEL_ID = "tft_fast_translator_channel"
         private const val NOTIF_ID = 1001
-        private const val CAPTURE_SCALE = 0.7f
+        private const val CAPTURE_SCALE = 0.75f
     }
 
     private lateinit var windowManager: WindowManager
     private var mediaProjection: MediaProjection? = null
     private var virtualDisplay: VirtualDisplay? = null
     private var imageReader: ImageReader? = null
+
+    private var customCropRect: RectF? = null
 
     private var bubbleView: TextView? = null
     private var resultContainer: ScrollView? = null
@@ -107,14 +110,32 @@ class FloatingTranslateService : Service() {
 
     private fun setupMediaProjection(resultCode: Int, data: Intent) {
         val mpm = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-        releaseCapture()
+        try { virtualDisplay?.release() } catch (_: Exception) {}
+        virtualDisplay = null
+        try { imageReader?.close() } catch (_: Exception) {}
+        imageReader = null
         mediaProjection?.stop()
+
         mediaProjection = mpm.getMediaProjection(resultCode, data)
         mediaProjection?.registerCallback(object : MediaProjection.Callback() {
             override fun onStop() {
                 stopSelf()
             }
         }, mainHandler)
+
+        val (w, h, d) = getScreenDimensions()
+        val capW = (w * CAPTURE_SCALE).toInt().coerceAtLeast(1)
+        val capH = (h * CAPTURE_SCALE).toInt().coerceAtLeast(1)
+
+        // Create once with null surface (paused = 0 battery drain)
+        virtualDisplay = mediaProjection?.createVirtualDisplay(
+            "TFTTranslatorCapture",
+            capW, capH, d,
+            DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+            null,
+            null,
+            mainHandler
+        )
     }
 
     private fun getScreenDimensions(): Triple<Int, Int, Int> {
@@ -130,26 +151,19 @@ class FloatingTranslateService : Service() {
         }
     }
 
-    private fun startOneShotCapture() {
-        releaseCapture()
+    private fun resumeCaptureSurface() {
         val (w, h, d) = getScreenDimensions()
         val capW = (w * CAPTURE_SCALE).toInt().coerceAtLeast(1)
         val capH = (h * CAPTURE_SCALE).toInt().coerceAtLeast(1)
 
+        try { imageReader?.close() } catch (_: Exception) {}
         imageReader = ImageReader.newInstance(capW, capH, PixelFormat.RGBA_8888, 2)
-        virtualDisplay = mediaProjection?.createVirtualDisplay(
-            "TFTTranslatorCapture",
-            capW, capH, d,
-            DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-            imageReader?.surface,
-            null,
-            mainHandler
-        )
+        virtualDisplay?.resize(capW, capH, d)
+        virtualDisplay?.surface = imageReader?.surface
     }
 
-    private fun releaseCapture() {
-        try { virtualDisplay?.release() } catch (_: Exception) {}
-        virtualDisplay = null
+    private fun pauseCaptureSurface() {
+        try { virtualDisplay?.surface = null } catch (_: Exception) {}
         try { imageReader?.close() } catch (_: Exception) {}
         imageReader = null
     }
@@ -233,8 +247,8 @@ class FloatingTranslateService : Service() {
     private fun openRegionSelector() {
         if (regionSelectorView != null) return
         hideResultCard()
-        val selector = RegionSelectorView(this, Prefs.getCropRect(this)) { newNormRect ->
-            Prefs.saveCropRect(this, newNormRect)
+        val selector = RegionSelectorView(this, customCropRect ?: RectF(0f, 0f, 1f, 1f)) { newNormRect ->
+            customCropRect = newNormRect
             removeRegionSelector()
             Toast.makeText(this, "Đã lưu vùng quét mới!", Toast.LENGTH_SHORT).show()
         }
@@ -264,11 +278,18 @@ class FloatingTranslateService : Service() {
         hideResultCard()
         bubbleView?.visibility = View.INVISIBLE
 
-        startOneShotCapture()
+        try {
+            resumeCaptureSurface()
+        } catch (e: Throwable) {
+            bubbleView?.visibility = View.VISIBLE
+            isProcessing = false
+            showResultCard("Lỗi khởi tạo chụp màn hình: ${e.message}")
+            return
+        }
 
         mainHandler.postDelayed({
             val bitmap = captureFrame()
-            releaseCapture()
+            pauseCaptureSurface()
             bubbleView?.visibility = View.VISIBLE
 
             if (bitmap == null) {
@@ -279,7 +300,7 @@ class FloatingTranslateService : Service() {
 
             showResultCard("Đang dịch...")
 
-            val cropNorm = Prefs.getCropRect(this)
+            val cropNorm = customCropRect ?: RectF(0f, 0f, 1f, 1f)
             val left = (cropNorm.left * bitmap.width).toInt().coerceIn(0, bitmap.width - 1)
             val top = (cropNorm.top * bitmap.height).toInt().coerceIn(0, bitmap.height - 1)
             val cropW = ((cropNorm.right - cropNorm.left) * bitmap.width).toInt().coerceIn(1, bitmap.width - left)
@@ -306,7 +327,7 @@ class FloatingTranslateService : Service() {
                     val extracted = sortedBlocks.joinToString("\n") { it.text }.trim()
                     if (extracted.isEmpty()) {
                         isProcessing = false
-                        showResultCard("Không nhận diện được chữ tiếng Trung trong vùng quét.\n(Nhấn giữ nút Dịch để chọn lại vùng quét)")
+                        showResultCard("Không nhận diện được chữ tiếng Trung trên màn hình.")
                         return@addOnSuccessListener
                     }
 
@@ -368,8 +389,8 @@ class FloatingTranslateService : Service() {
             }
 
             val (w, h, _) = getScreenDimensions()
-            val maxW = (w * 0.72f).toInt()
-            val maxH = (h * 0.65f).toInt()
+            val maxW = (w * 0.78f).toInt()
+            val maxH = (h * 0.68f).toInt()
 
             val params = WindowManager.LayoutParams(
                 maxW,
@@ -436,7 +457,9 @@ class FloatingTranslateService : Service() {
             try { windowManager.removeView(it) } catch (_: Exception) {}
         }
         bubbleView = null
-        releaseCapture()
+        pauseCaptureSurface()
+        try { virtualDisplay?.release() } catch (_: Exception) {}
+        virtualDisplay = null
         mediaProjection?.stop()
         recognizer.close()
     }
